@@ -1,5 +1,6 @@
 const express = require('express')
 const app = express()
+app.use(express.json()) //Destructure the objects
 
 const path = require('path')
 const {open} = require('sqlite')
@@ -69,12 +70,61 @@ app.get('/movies/:movieId/', async (request, response) => {
 //4. Put movie details based on movie_id
 
 app.put('/movies/:movieId', async (request, response) => {
-  const {bookId} = request.params
+  const {movieId} = request.params
   const {directorId, movieName, leadActor} = request.body
   const updateMovieQuery = `
   UPDATE movie 
   SET director_id = ${directorId}, movie_name = '${movieName}', lead_actor = '${leadActor}'
-  WHERE book_id = ${bookId};`
+  WHERE movie_id = ${movieId};`
   await db.run(updateMovieQuery)
-  response.send('Movie Details Up')
+  response.send('Movie Details Updated')
 })
+
+//5. Delete the movie based on movie_id
+
+app.delete('/movies/:movieId', async (request, response) => {
+  const {movieId} = request.params
+  const deleteMovieQuery = `
+  DELETE FROM movie WHERE movie_id = ${movieId};`
+  await db.run(deleteMovieQuery)
+  response.send('Movie Removed')
+})
+
+//6.Get list of all directors in director table
+
+const convertDbObjOfDirector = dbObject => {
+  return {
+    directorId: dbObject.director_id,
+    directorName: dbObject.director_name,
+  }
+}
+
+app.get('/directors/', async (request, response) => {
+  const getAllDirectorsQuery = `SELECT * FROM director ORDER BY director_id`
+  const directorArray = await db.all(getAllDirectorsQuery)
+  response.send(
+    directorArray.map(eachDirector => convertDbObjOfDirector(eachDirector)),
+  )
+})
+
+//Get list of all movies directed by given director_id
+
+const convertDbObjOfDirectorMovies = dbObject => {
+  return {
+    movieName: dbObject.movie_name,
+  }
+}
+
+app.get('/directors/:directorId/movies/', async (request, response) => {
+  const {directorId} = request.params
+  const getMoviesOfDirector = `
+  SELECT movie_name FROM movie WHERE director_id = ${directorId}`
+  const moviesOfDirectorArray = await db.all(getMoviesOfDirector)
+  response.send(
+    moviesOfDirectorArray.map(eachMovie =>
+      convertDbObjOfDirectorMovies(eachMovie),
+    ),
+  )
+})
+
+module.exports = app
